@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Tamenny — Scam & Phishing Detector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #060b10;
+  --panel: #0c1520;
+  --panel2: #101d2a;
+  --border: #1b3348;
+  --border-bright: #2a4d6a;
+  --cyan: #00d4ff;
+  --cyan-dim: rgba(0,212,255,0.12);
+  --red: #ff4060;
+  --red-dim: rgba(255,64,96,0.12);
+  --green: #00ff8c;
+  --green-dim: rgba(0,255,140,0.1);
+  --yellow: #ffd050;
+  --yellow-dim: rgba(255,208,80,0.1);
+  --text: #b8d4e4;
+  --text-dim: #4d7a90;
+  --text-bright: #e8f4ff;
+  --mono: 'IBM Plex Mono', monospace;
+  --display: 'Bebas Neue', sans-serif;
+  --body: 'DM Sans', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--body); min-height: 100vh; overflow-x: hidden; }
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background-image: linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px; pointer-events: none; z-index: 0;
+}
+header {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 32px; background: rgba(6,11,16,0.9);
+  backdrop-filter: blur(20px); border-bottom: 1px solid var(--border);
+}
+.logo { font-family: var(--display); font-size: 1.8rem; letter-spacing: 0.12em; color: var(--cyan); text-decoration: none; }
+.logo-sub { font-family: var(--mono); font-size: 0.62rem; color: var(--text-dim); letter-spacing: 0.08em; text-transform: uppercase; margin-top: -4px; }
+.header-right { display: flex; align-items: center; gap: 16px; }
+.header-badge { font-family: var(--mono); font-size: 0.68rem; color: var(--green); border: 1px solid var(--green); padding: 4px 12px; letter-spacing: 0.08em; text-transform: uppercase; animation: pulse-border 2s ease-in-out infinite; }
+@keyframes pulse-border { 0%,100% { border-color: var(--green); } 50% { border-color: rgba(0,255,140,0.3); } }
+.btn-login-header { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cyan); border: 1px solid var(--cyan); background: transparent; padding: 6px 16px; cursor: pointer; transition: all 0.2s; }
+.btn-login-header:hover { background: var(--cyan-dim); }
+.user-badge { display: none; align-items: center; gap: 10px; font-family: var(--mono); font-size: 0.68rem; color: var(--text); }
+.user-badge.show { display: flex; }
+.user-avatar { width: 28px; height: 28px; border: 1px solid var(--cyan); background: var(--cyan-dim); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: var(--cyan); font-weight: 600; }
+.btn-logout { font-family: var(--mono); font-size: 0.62rem; color: var(--text-dim); border: 1px solid var(--border); background: transparent; padding: 4px 10px; cursor: pointer; transition: all 0.2s; letter-spacing: 0.06em; text-transform: uppercase; }
+.btn-logout:hover { border-color: var(--red); color: var(--red); }
+.modal-overlay { display: none; position: fixed; inset: 0; z-index: 200; background: rgba(6,11,16,0.85); backdrop-filter: blur(8px); align-items: center; justify-content: center; }
+.modal-overlay.show { display: flex; }
+.auth-card { background: var(--panel); border: 1px solid var(--border-bright); padding: 36px 32px; width: 100%; max-width: 420px; position: relative; }
+.auth-title { font-family: var(--display); font-size: 2rem; letter-spacing: 0.1em; color: var(--cyan); margin-bottom: 4px; }
+.auth-sub { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 28px; }
+.auth-field { margin-bottom: 16px; }
+.auth-field .field-label { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+.auth-input { width: 100%; background: var(--panel2); border: 1px solid var(--border); color: var(--text-bright); font-family: var(--mono); font-size: 0.82rem; padding: 11px 14px; outline: none; transition: border-color 0.2s; }
+.auth-input:focus { border-color: var(--cyan); }
+.auth-input::placeholder { color: var(--text-dim); }
+.auth-input.invalid { border-color: var(--red); }
+.auth-error { display: none; background: var(--red-dim); border: 1px solid rgba(255,64,96,0.4); padding: 10px 14px; font-family: var(--mono); font-size: 0.75rem; color: var(--red); margin-bottom: 14px; }
+.auth-error.show { display: block; }
+.btn-auth-submit { width: 100%; padding: 14px; background: var(--cyan); color: var(--bg); border: none; cursor: pointer; font-family: var(--display); font-size: 1.2rem; letter-spacing: 0.14em; transition: all 0.2s; margin-top: 8px; }
+.btn-auth-submit:hover { background: #33ddff; }
+.btn-auth-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.auth-switch { text-align: center; margin-top: 20px; font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); letter-spacing: 0.04em; }
+.auth-switch a { color: var(--cyan); cursor: pointer; text-decoration: none; border-bottom: 1px solid rgba(0,212,255,0.3); transition: border-color 0.2s; }
+.auth-switch a:hover { border-color: var(--cyan); }
+.auth-close { position: absolute; top: 14px; right: 16px; background: none; border: none; color: var(--text-dim); font-size: 1.2rem; cursor: pointer; line-height: 1; transition: color 0.2s; }
+.auth-close:hover { color: var(--text-bright); }
+main { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+.panel { background: var(--panel); border: 1px solid var(--border); padding: 28px; }
+.panel-title { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--cyan); margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+.panel-title::before { content: ''; display: block; width: 3px; height: 14px; background: var(--cyan); }
+.channel-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+.ch-btn { background: var(--panel2); border: 1px solid var(--border); padding: 12px 8px; cursor: pointer; text-align: center; transition: all 0.18s; color: var(--text-dim); }
+.ch-btn:hover { border-color: var(--border-bright); color: var(--text); }
+.ch-btn.active { border-color: var(--cyan); background: var(--cyan-dim); color: var(--cyan); }
+.ch-btn .ch-icon { font-size: 1.4rem; display: block; margin-bottom: 4px; }
+.ch-btn .ch-label { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.input-wrap { position: relative; margin-bottom: 16px; }
+textarea { width: 100%; min-height: 180px; background: var(--panel2); border: 1px solid var(--border); color: var(--text-bright); font-family: var(--mono); font-size: 0.82rem; line-height: 1.7; padding: 16px; resize: vertical; outline: none; transition: border-color 0.2s; }
+textarea:focus { border-color: var(--cyan); }
+textarea::placeholder { color: var(--text-dim); }
+.extra-fields { display: none; gap: 10px; flex-direction: column; margin-bottom: 16px; }
+.extra-fields.show { display: flex; }
+input[type="text"], input[type="email"], input[type="password"] { flex: 1; background: var(--panel2); border: 1px solid var(--border); color: var(--text-bright); font-family: var(--mono); font-size: 0.78rem; padding: 10px 14px; outline: none; transition: border-color 0.2s; width: 100%; }
+input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus { border-color: var(--cyan); }
+input[type="text"]::placeholder, input[type="email"]::placeholder, input[type="password"]::placeholder { color: var(--text-dim); }
+.field-label { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+.eml-upload-wrap { display: none; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+.eml-upload-wrap.show { display: flex; }
+.eml-dropzone { border: 1px dashed var(--border-bright); background: var(--panel2); padding: 28px 20px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+.eml-dropzone:hover, .eml-dropzone.dragover { border-color: var(--cyan); background: var(--cyan-dim); }
+.eml-dropzone.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+.eml-dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.eml-drop-icon { font-size: 2rem; margin-bottom: 8px; display: block; opacity: 0.5; }
+.eml-drop-label { font-family: var(--mono); font-size: 0.72rem; color: var(--text-dim); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
+.eml-drop-hint { font-size: 0.78rem; color: var(--text-dim); }
+.eml-drop-hint span { font-family: var(--mono); color: var(--cyan); font-size: 0.7rem; }
+.eml-file-status { display: none; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel2); border: 1px solid var(--border); font-family: var(--mono); font-size: 0.75rem; }
+.eml-file-status.show { display: flex; }
+.eml-file-icon { font-size: 1.1rem; flex-shrink: 0; }
+.eml-file-name { color: var(--green); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.eml-file-size { color: var(--text-dim); font-size: 0.68rem; flex-shrink: 0; }
+.eml-clear-btn { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 0.9rem; line-height: 1; transition: color 0.2s; flex-shrink: 0; }
+.eml-clear-btn:hover { color: var(--red); }
+.eml-error { display: none; padding: 10px 14px; background: var(--red-dim); border: 1px solid rgba(255,64,96,0.4); font-family: var(--mono); font-size: 0.75rem; color: var(--red); }
+.eml-error.show { display: block; }
+.btn-analyze { width: 100%; padding: 16px; background: var(--cyan); color: var(--bg); border: none; cursor: pointer; font-family: var(--display); font-size: 1.3rem; letter-spacing: 0.14em; transition: all 0.2s; }
+.btn-analyze:hover:not(:disabled) { background: #33ddff; }
+.btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-analyze .btn-inner { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.progress-wrap { display: none; margin-top: 16px; }
+.progress-wrap.show { display: block; }
+.progress-steps { display: flex; flex-direction: column; gap: 6px; }
+.prog-step { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 0.75rem; color: var(--text-dim); padding: 8px 12px; background: var(--panel2); border: 1px solid var(--border); transition: all 0.3s; }
+.prog-step.active { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-dim); }
+.prog-step.done { color: var(--green); border-color: rgba(0,255,140,0.2); }
+.prog-step.error { color: var(--red); }
+.prog-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--border); }
+.prog-step.active .prog-dot { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); animation: blink-dot 0.8s ease infinite; }
+.prog-step.done .prog-dot { background: var(--green); }
+.prog-step.error .prog-dot { background: var(--red); }
+@keyframes blink-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.results-panel { display: flex; flex-direction: column; gap: 16px; }
+.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 400px; border: 1px dashed var(--border); text-align: center; padding: 40px; color: var(--text-dim); }
+.empty-icon { font-size: 3rem; margin-bottom: 16px; opacity: 0.4; }
+.empty-title { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+.empty-desc { font-size: 0.85rem; line-height: 1.6; }
+.verdict-card { padding: 24px; border: 1px solid; display: none; }
+.verdict-card.show { display: block; }
+.verdict-card.safe { border-color: rgba(0,255,140,0.3); background: var(--green-dim); }
+.verdict-card.warn { border-color: rgba(255,208,80,0.3); background: var(--yellow-dim); }
+.verdict-card.danger { border-color: rgba(255,64,96,0.4); background: var(--red-dim); }
+.verdict-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.verdict-label-wrap { display: flex; align-items: center; gap: 12px; }
+.verdict-emoji { font-size: 2rem; }
+.verdict-title { font-family: var(--display); font-size: 2.2rem; letter-spacing: 0.08em; line-height: 1; }
+.verdict-card.safe .verdict-title { color: var(--green); }
+.verdict-card.warn .verdict-title { color: var(--yellow); }
+.verdict-card.danger .verdict-title { color: var(--red); }
+.verdict-score-badge { font-family: var(--display); font-size: 2.8rem; letter-spacing: 0.06em; line-height: 1; }
+.verdict-card.safe .verdict-score-badge { color: var(--green); }
+.verdict-card.warn .verdict-score-badge { color: var(--yellow); }
+.verdict-card.danger .verdict-score-badge { color: var(--red); }
+.verdict-score-label { font-family: var(--mono); font-size: 0.58rem; color: var(--text-dim); text-align: center; letter-spacing: 0.1em; text-transform: uppercase; }
+.verdict-message { font-size: 0.9rem; line-height: 1.7; color: var(--text-bright); border-top: 1px solid var(--border); padding-top: 14px; }
+.btn-download-pdf { display: inline-block; margin-top: 12px; font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cyan); border: 1px solid var(--cyan); background: transparent; padding: 7px 16px; cursor: pointer; transition: all 0.2s; }
+.btn-download-pdf:hover { background: var(--cyan-dim); }
+.score-breakdown { background: var(--panel); border: 1px solid var(--border); padding: 20px; display: none; }
+.score-breakdown.show { display: block; }
+.sb-title { font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 16px; }
+.sb-row { margin-bottom: 14px; }
+.sb-row-top { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 0.75rem; margin-bottom: 6px; }
+.sb-key { color: var(--text); }
+.sb-val { font-weight: 600; }
+.sb-track { height: 4px; background: var(--panel2); border: 1px solid var(--border); position: relative; overflow: hidden; }
+.sb-fill { height: 100%; position: absolute; left: 0; top: 0; transition: width 1.2s cubic-bezier(0.4,0,0.2,1); }
+.detail-block { background: var(--panel); border: 1px solid var(--border); display: none; }
+.detail-block.show { display: block; }
+.detail-header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: background 0.15s; }
+.detail-header:hover { background: var(--panel2); }
+.detail-header-left { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.detail-header-icon { font-size: 1rem; }
+.detail-toggle { font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); transition: transform 0.2s; }
+.detail-header.open .detail-toggle { transform: rotate(180deg); }
+.detail-body { padding: 16px 20px; display: none; }
+.detail-body.open { display: block; }
+.detail-row { display: flex; align-items: flex-start; gap: 12px; padding: 7px 0; border-bottom: 1px solid rgba(27,51,72,0.5); font-family: var(--mono); font-size: 0.75rem; }
+.detail-row:last-child { border-bottom: none; }
+.detail-row-key { color: var(--text-dim); min-width: 140px; flex-shrink: 0; }
+.detail-row-val { color: var(--text-bright); word-break: break-all; line-height: 1.5; }
+.val-pass { color: var(--green); }
+.val-fail { color: var(--red); }
+.val-warn { color: var(--yellow); }
+.val-info { color: var(--cyan); }
+.keyword-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.kw-tag { font-family: var(--mono); font-size: 0.65rem; padding: 3px 10px; border: 1px solid var(--border); letter-spacing: 0.06em; }
+.kw-tag.high { border-color: rgba(255,64,96,0.4); color: var(--red); background: var(--red-dim); }
+.kw-tag.med { border-color: rgba(255,208,80,0.3); color: var(--yellow); background: var(--yellow-dim); }
+.kw-tag.low { border-color: var(--border); color: var(--text-dim); }
+.btn-reset { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 10px 20px; background: transparent; border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; transition: all 0.2s; align-self: flex-start; display: none; }
+.btn-reset.show { display: block; }
+.btn-reset:hover { border-color: var(--cyan); color: var(--cyan); }
+.full-width { grid-column: 1 / -1; }
+.error-toast { display: none; background: var(--red-dim); border: 1px solid rgba(255,64,96,0.4); padding: 12px 16px; font-family: var(--mono); font-size: 0.78rem; color: var(--red); margin-top: 12px; }
+.error-toast.show { display: block; }
+.history-list { display: flex; flex-direction: column; gap: 8px; }
+.history-filters { display: flex; gap: 8px; margin-bottom: 14px; }
+.btn-hist-filter { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 14px; background: var(--panel2); border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; transition: all 0.18s; }
+.btn-hist-filter:hover { border-color: var(--border-bright); color: var(--text); }
+.btn-hist-filter.active-all { border-color: var(--cyan); background: var(--cyan-dim); color: var(--cyan); }
+.btn-hist-filter.active-spam { border-color: var(--red); background: var(--red-dim); color: var(--red); }
+.btn-hist-filter.active-legit { border-color: var(--green); background: var(--green-dim); color: var(--green); }
+.hist-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--panel2); border: 1px solid var(--border); cursor: pointer; transition: all 0.15s; }
+.hist-item:hover { border-color: var(--border-bright); }
+.hist-item[data-hidden="true"] { display: none; }
+.hist-badge { font-family: var(--display); font-size: 1rem; letter-spacing: 0.06em; min-width: 32px; text-align: center; }
+.hist-badge.safe { color: var(--green); }
+.hist-badge.warn { color: var(--yellow); }
+.hist-badge.danger { color: var(--red); }
+.hist-info { flex: 1; min-width: 0; }
+.hist-channel { font-family: var(--mono); font-size: 0.62rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+.hist-preview { font-size: 0.82rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hist-score { font-family: var(--mono); font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; }
+.no-history { font-family: var(--mono); font-size: 0.75rem; color: var(--text-dim); text-align: center; padding: 24px; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--panel); }
+::-webkit-scrollbar-thumb { background: var(--border); }
+</style>
+</head>
+<body>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="auth-modal">
+  <div class="auth-card">
+    <button class="auth-close" onclick="closeAuthModal()">✕</button>
+    <div id="view-login">
+      <div class="auth-title">SIGN IN</div>
+      <div class="auth-sub">Access your Tamenny account</div>
+      <div class="auth-error" id="login-error"></div>
+      <div class="auth-field"><div class="field-label">Email</div>
+        <input class="auth-input" type="email" id="login-email" placeholder="you@example.com"/>
+      </div>
+      <div class="auth-field"><div class="field-label">Password</div>
+        <input class="auth-input" type="password" id="login-password" placeholder="••••••••"/>
+      </div>
+      <button class="btn-auth-submit" id="login-submit-btn" onclick="submitLogin()">LOGIN</button>
+      <div class="auth-switch">Don't have an account? <a onclick="switchToSignup()">Sign up</a></div>
+    </div>
+    <div id="view-signup" style="display:none">
+      <div class="auth-title">SIGN UP</div>
+      <div class="auth-sub">Create your Tamenny account</div>
+      <div class="auth-error" id="signup-error"></div>
+      <div class="auth-field"><div class="field-label">Email</div>
+        <input class="auth-input" type="email" id="signup-email" placeholder="you@example.com"/>
+      </div>
+      <div class="auth-field"><div class="field-label">Username</div>
+        <input class="auth-input" type="text" id="signup-username" placeholder="e.g. user123"/>
+      </div>
+      <div class="auth-field"><div class="field-label">Password</div>
+        <input class="auth-input" type="password" id="signup-password" placeholder="Min. 6 characters"/>
+      </div>
+      <button class="btn-auth-submit" id="signup-submit-btn" onclick="submitSignup()">CREATE ACCOUNT</button>
+      <div class="auth-switch">Already have an account? <a onclick="switchToLogin()">Sign in</a></div>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div>
+    <a class="logo" href="#">TAMENNY</a>
+    <div class="logo-sub">Scam &amp; Phishing Detector</div>
+  </div>
+  <div class="header-right">
+    <div class="header-badge">🟢 AI Active</div>
+    <button class="btn-login-header" id="btn-login-header" onclick="openAuthModal('login')">LOGIN</button>
+    <div class="user-badge" id="user-badge">
+      <div class="user-avatar" id="user-avatar"></div>
+      <span id="user-name-display"></span>
+      <button class="btn-logout" onclick="logoutUser()">Logout</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- LEFT: INPUT -->
+  <div>
+    <div class="panel">
+      <div class="panel-title">Select Channel</div>
+      <div class="channel-grid">
+        <button class="ch-btn active" data-channel="email" onclick="selectChannel('email',this)"><span class="ch-icon">📧</span><span class="ch-label">Email</span></button>
+        <button class="ch-btn" data-channel="sms" onclick="selectChannel('sms',this)"><span class="ch-icon">📱</span><span class="ch-label">SMS</span></button>
+        <button class="ch-btn" data-channel="whatsapp" onclick="selectChannel('whatsapp',this)"><span class="ch-icon">💬</span><span class="ch-label">WhatsApp</span></button>
+        <button class="ch-btn" data-channel="telegram" onclick="selectChannel('telegram',this)"><span class="ch-icon">✈️</span><span class="ch-label">Telegram</span></button>
+      </div>
+
+      <!-- EMAIL: EML Upload -->
+      <div class="eml-upload-wrap show" id="email-fields">
+        <div class="panel-title" style="margin-bottom:12px;">Upload Email File</div>
+        <div class="eml-dropzone" id="eml-dropzone"
+             ondragover="onEmlDragOver(event)" ondragleave="onEmlDragLeave(event)" ondrop="onEmlDrop(event)">
+          <input type="file" id="eml-file-input" accept=".eml" onchange="onEmlFileSelected(event)"/>
+          <span class="eml-drop-icon">📂</span>
+          <div class="eml-drop-label">Drop .eml file here</div>
+          <div class="eml-drop-hint">or click to browse — <span>only .eml accepted</span></div>
+        </div>
+        <div class="eml-file-status" id="eml-file-status">
+          <span class="eml-file-icon">📧</span>
+          <span class="eml-file-name" id="eml-file-name"></span>
+          <span class="eml-file-size" id="eml-file-size"></span>
+          <button class="eml-clear-btn" onclick="clearEmlFile()">✕</button>
+        </div>
+        <div class="eml-error" id="eml-error"></div>
+      </div>
+
+      <!-- SMS fields -->
+      <div class="extra-fields" id="sms-fields">
+        <div><div class="field-label">Sender ID / Number</div>
+          <input type="text" id="field-sms-sender" placeholder="e.g. +201234567890 or BANK"/></div>
+      </div>
+      <!-- WhatsApp / Telegram fields -->
+      <div class="extra-fields" id="wa-fields">
+        <div><div class="field-label">Sender Number / Username</div>
+          <input type="text" id="field-wa-sender" placeholder="e.g. +201234567890"/></div>
+      </div>
+
+      <div class="panel-title" style="margin-top:4px;">Message Content</div>
+      <div class="input-wrap">
+        <textarea id="msg-input" oninput="onMessageInputChange()" placeholder="Paste the suspicious message here — or it will be auto-filled from the .eml file"></textarea>
+      </div>
+
+      <div id="error-toast" class="error-toast"></div>
+
+      <button class="btn-analyze" id="analyze-btn" onclick="runAnalysis()">
+        <div class="btn-inner"><span id="btn-text">🔍 ANALYZE MESSAGE</span></div>
+      </button>
+
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-steps" id="progress-steps">
+          <div class="prog-step" id="step-parse"><div class="prog-dot"></div>Parsing message &amp; metadata</div>
+          <div class="prog-step" id="step-vt"><div class="prog-dot"></div>VirusTotal link &amp; attachment scan</div>
+          <div class="prog-step" id="step-phish"><div class="prog-dot"></div>Phishing rule engine</div>
+          <div class="prog-step" id="step-nlp"><div class="prog-dot"></div>NLP spam classification</div>
+          <div class="prog-step" id="step-score"><div class="prog-dot"></div>Computing risk score &amp; verdict</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="panel" style="margin-top:16px;">
+      <div class="panel-title">Analysis History</div>
+      <div class="history-filters">
+        <button class="btn-hist-filter active-all" id="hist-btn-all" onclick="filterHistory('all')">All</button>
+        <button class="btn-hist-filter" id="hist-btn-spam" onclick="filterHistory('spam')">🚨 Spam</button>
+        <button class="btn-hist-filter" id="hist-btn-legit" onclick="filterHistory('legit')">✅ Legitimate</button>
+      </div>
+      <div class="history-list" id="history-list">
+        <div class="no-history" id="no-history-msg">No analyses yet this session</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: RESULTS -->
+  <div class="results-panel" id="results-panel">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">🛡️</div>
+      <div class="empty-title">Awaiting Analysis</div>
+      <div class="empty-desc">Select a channel, upload a .eml file or paste a message, and hit Analyze. Tamenny runs a full pipeline: VirusTotal, phishing rules, and NLP classification.</div>
+    </div>
+
+    <div class="verdict-card" id="verdict-card">
+      <div class="verdict-top">
+        <div class="verdict-label-wrap">
+          <span class="verdict-emoji" id="verdict-emoji"></span>
+          <div>
+            <div class="verdict-title" id="verdict-title"></div>
+            <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text-dim);letter-spacing:0.1em;text-transform:uppercase;margin-top:2px;" id="verdict-sub"></div>
+          </div>
+        </div>
+        <div style="text-align:center">
+          <div class="verdict-score-badge" id="verdict-score"></div>
+          <div class="verdict-score-label">/ 100</div>
+        </div>
+      </div>
+      <div class="verdict-message" id="verdict-message"></div>
+      <button class="btn-download-pdf" id="btn-pdf" style="display:none" onclick="downloadPDF()">⬇ Download Full PDF Report</button>
+    </div>
+
+    <div class="score-breakdown" id="score-breakdown">
+      <div class="sb-title">// Score Breakdown</div>
+      <div class="sb-row">
+        <div class="sb-row-top"><span class="sb-key">Phishing Flags Score</span><span class="sb-val" id="sb-tech-val" style="color:var(--cyan)"></span></div>
+        <div class="sb-track"><div class="sb-fill" id="sb-tech-bar" style="background:var(--cyan);width:0%"></div></div>
+      </div>
+      <div class="sb-row">
+        <div class="sb-row-top"><span class="sb-key">NLP Spam Score</span><span class="sb-val" id="sb-nlp-val" style="color:#a855f7"></span></div>
+        <div class="sb-track"><div class="sb-fill" id="sb-nlp-bar" style="background:#a855f7;width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="detail-block" id="block-flags">
+      <div class="detail-header" onclick="toggleDetail('flags')">
+        <div class="detail-header-left"><span class="detail-header-icon">🚩</span>Phishing Flags</div>
+        <span class="detail-toggle">▼</span>
+      </div>
+      <div class="detail-body" id="body-flags"></div>
+    </div>
+
+    <div class="detail-block" id="block-nlp">
+      <div class="detail-header" onclick="toggleDetail('nlp')">
+        <div class="detail-header-left"><span class="detail-header-icon">🧠</span>NLP Classification</div>
+        <span class="detail-toggle">▼</span>
+      </div>
+      <div class="detail-body" id="body-nlp"></div>
+    </div>
+
+    <div class="detail-block" id="block-vt">
+      <div class="detail-header" onclick="toggleDetail('vt')">
+        <div class="detail-header-left"><span class="detail-header-icon">🔗</span>VirusTotal Results</div>
+        <span class="detail-toggle">▼</span>
+      </div>
+      <div class="detail-body" id="body-vt"></div>
+    </div>
+
+    <div class="detail-block" id="block-meta">
+      <div class="detail-header" onclick="toggleDetail('meta')">
+        <div class="detail-header-left"><span class="detail-header-icon">📋</span>Email Metadata</div>
+        <span class="detail-toggle">▼</span>
+      </div>
+      <div class="detail-body" id="body-meta"></div>
+    </div>
+
+    <button class="btn-reset" id="reset-btn" onclick="resetApp()">← Analyze Another</button>
+  </div>
+</main>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════════════ */
+let currentChannel = 'email';
+let analysisHistory = [];
+let isAnalyzing = false;
+let currentHistoryFilter = 'all';
+let currentUser = null;
+let uploadedEmlFile = null;
+let lastAnalysisId = null;   // DB id for PDF download
+let authToken = null;
+
+/* ══════════════════════════════════════════════════════════════
+   TOKEN STORAGE
+══════════════════════════════════════════════════════════════ */
+function saveToken(token) {
+  authToken = token;
+  sessionStorage.setItem('tamenny_token', token);
+}
+function loadToken() {
+  authToken = sessionStorage.getItem('tamenny_token');
+}
+function clearToken() {
+  authToken = null;
+  sessionStorage.removeItem('tamenny_token');
+}
+function authHeaders() {
+  return authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+}
+
+/* ══════════════════════════════════════════════════════════════
+   AUTH MODAL
+══════════════════════════════════════════════════════════════ */
+function openAuthModal(view = 'login') {
+  document.getElementById('auth-modal').classList.add('show');
+  view === 'login' ? showLoginView() : showSignupView();
+}
+function closeAuthModal() {
+  document.getElementById('auth-modal').classList.remove('show');
+  clearAuthErrors();
+}
+document.getElementById('auth-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeAuthModal();
+});
+function showLoginView() {
+  document.getElementById('view-login').style.display = '';
+  document.getElementById('view-signup').style.display = 'none';
+  clearAuthErrors();
+}
+function showSignupView() {
+  document.getElementById('view-login').style.display = 'none';
+  document.getElementById('view-signup').style.display = '';
+  clearAuthErrors();
+}
+function switchToSignup() { showSignupView(); }
+function switchToLogin()  { showLoginView(); }
+function clearAuthErrors() {
+  ['login-error','signup-error'].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('show');
+    el.textContent = '';
+  });
+  document.querySelectorAll('.auth-input').forEach(i => i.classList.remove('invalid'));
+}
+function showAuthError(elId, msg) {
+  const el = document.getElementById(elId);
+  el.textContent = msg;
+  el.classList.add('show');
+}
+function isValidEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim()); }
+
+async function submitLogin() {
+  clearAuthErrors();
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!email || !isValidEmail(email)) {
+    document.getElementById('login-email').classList.add('invalid');
+    return showAuthError('login-error', 'Enter a valid email address.');
+  }
+  if (!password) {
+    document.getElementById('login-password').classList.add('invalid');
+    return showAuthError('login-error', 'Password is required.');
+  }
+  const btn = document.getElementById('login-submit-btn');
+  btn.disabled = true; btn.textContent = 'LOGGING IN...';
+  try {
+    // OAuth2PasswordRequestForm expects form-encoded data
+    const body = new URLSearchParams({ username: email, password });
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      saveToken(data.access_token);
+      // Fetch user profile
+      const me = await fetch('/api/users/me', { headers: authHeaders() });
+      const user = me.ok ? await me.json() : { username: email.split('@')[0] };
+      setLoggedIn(user.username);
+      closeAuthModal();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showAuthError('login-error', err.detail || 'Invalid email or password.');
+    }
+  } catch (err) {
+    showAuthError('login-error', 'Cannot reach server. Is Uvicorn running?');
+  } finally {
+    btn.disabled = false; btn.textContent = 'LOGIN';
+  }
+}
+
+async function submitSignup() {
+  clearAuthErrors();
+  const email    = document.getElementById('signup-email').value.trim();
+  const username = document.getElementById('signup-username').value.trim();
+  const password = document.getElementById('signup-password').value;
+  if (!email || !isValidEmail(email)) {
+    document.getElementById('signup-email').classList.add('invalid');
+    return showAuthError('signup-error', 'Enter a valid email address.');
+  }
+  if (!username || username.length < 3) {
+    document.getElementById('signup-username').classList.add('invalid');
+    return showAuthError('signup-error', 'Username must be at least 3 characters.');
+  }
+  if (!password || password.length < 6) {
+    document.getElementById('signup-password').classList.add('invalid');
+    return showAuthError('signup-error', 'Password must be at least 6 characters.');
+  }
+  const btn = document.getElementById('signup-submit-btn');
+  btn.disabled = true; btn.textContent = 'CREATING...';
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, username, password }),
+    });
+    if (res.ok) {
+      // Auto-login after signup
+      const body = new URLSearchParams({ username: email, password });
+      const loginRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      });
+      if (loginRes.ok) {
+        const data = await loginRes.json();
+        saveToken(data.access_token);
+      }
+      setLoggedIn(username);
+      closeAuthModal();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showAuthError('signup-error', err.detail || 'Could not create account.');
+    }
+  } catch (err) {
+    showAuthError('signup-error', 'Cannot reach server. Is Uvicorn running?');
+  } finally {
+    btn.disabled = false; btn.textContent = 'CREATE ACCOUNT';
+  }
+}
+
+document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
+document.getElementById('signup-password').addEventListener('keydown', e => { if (e.key === 'Enter') submitSignup(); });
+
+function setLoggedIn(username) {
+  currentUser = { username };
+  document.getElementById('btn-login-header').style.display = 'none';
+  document.getElementById('user-badge').classList.add('show');
+  document.getElementById('user-name-display').textContent = username;
+  document.getElementById('user-avatar').textContent = username.charAt(0).toUpperCase();
+}
+function logoutUser() {
+  clearToken();
+  currentUser = null;
+  document.getElementById('btn-login-header').style.display = '';
+  document.getElementById('user-badge').classList.remove('show');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CHANNEL SELECTOR
+══════════════════════════════════════════════════════════════ */
+function selectChannel(ch, el) {
+  currentChannel = ch;
+  document.querySelectorAll('.ch-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('email-fields').classList.toggle('show', ch === 'email');
+  document.getElementById('sms-fields').classList.toggle('show', ch === 'sms');
+  document.getElementById('wa-fields').classList.toggle('show', ch === 'whatsapp' || ch === 'telegram');
+  const ta = document.getElementById('msg-input');
+  ta.placeholder = ch === 'email'
+    ? 'Auto-filled from .eml — or paste raw email text here'
+    : 'Paste the suspicious message here...';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   EML FILE HANDLING
+══════════════════════════════════════════════════════════════ */
+function onEmlDragOver(e) { e.preventDefault(); if (document.getElementById('eml-dropzone').classList.contains('disabled')) return; document.getElementById('eml-dropzone').classList.add('dragover'); }
+function onEmlDragLeave() { document.getElementById('eml-dropzone').classList.remove('dragover'); }
+function onEmlDrop(e) {
+  e.preventDefault();
+  const dropzone = document.getElementById('eml-dropzone');
+  dropzone.classList.remove('dragover');
+  if (dropzone.classList.contains('disabled')) return;
+  const file = e.dataTransfer.files[0];
+  if (file) processEmlFile(file);
+}
+function onEmlFileSelected(e) {
+  if (document.getElementById('eml-file-input').disabled) return;
+  const file = e.target.files[0];
+  if (file) processEmlFile(file);
+}
+
+function setEmlControlsEnabled(enabled) {
+  const dropzone = document.getElementById('eml-dropzone');
+  const input = document.getElementById('eml-file-input');
+  dropzone.classList.toggle('disabled', !enabled);
+  input.disabled = !enabled;
+}
+
+function setMessageInputEnabled(enabled) {
+  const textarea = document.getElementById('msg-input');
+  textarea.disabled = !enabled;
+  textarea.placeholder = enabled
+    ? 'Paste the suspicious message here — or it will be auto-filled from the .eml file'
+    : 'Uploaded .eml file is active; clear it to edit the message.';
+}
+
+function onMessageInputChange() {
+  const content = document.getElementById('msg-input').value.trim();
+  if (content.length > 0) {
+    if (uploadedEmlFile) {
+      clearEmlFile();
+    }
+    setEmlControlsEnabled(false);
+  } else {
+    setEmlControlsEnabled(true);
+  }
+}
+
+function processEmlFile(file) {
+  hideEmlError();
+  if (!file.name.endsWith('.eml')) return showEmlError('Only .eml files are accepted.');
+  if (file.size > 10 * 1024 * 1024) return showEmlError('File must be under 10 MB.');
+  uploadedEmlFile = file;
+  document.getElementById('eml-file-name').textContent = file.name;
+  document.getElementById('eml-file-size').textContent = (file.size / 1024).toFixed(1) + ' KB';
+  document.getElementById('eml-file-status').classList.add('show');
+  setMessageInputEnabled(false);
+  setEmlControlsEnabled(true);
+}
+function clearEmlFile() {
+  uploadedEmlFile = null;
+  document.getElementById('eml-file-input').value = '';
+  document.getElementById('eml-file-status').classList.remove('show');
+  hideEmlError();
+  const content = document.getElementById('msg-input').value.trim();
+  if (content.length === 0) {
+    setEmlControlsEnabled(true);
+  }
+  setMessageInputEnabled(true);
+}
+function showEmlError(msg) {
+  const el = document.getElementById('eml-error');
+  el.textContent = msg; el.classList.add('show');
+}
+function hideEmlError() { document.getElementById('eml-error').classList.remove('show'); }
+
+/* ══════════════════════════════════════════════════════════════
+   PROGRESS STEPS
+══════════════════════════════════════════════════════════════ */
+const EMAIL_STEPS  = ['step-parse','step-vt','step-phish','step-nlp','step-score'];
+const MSG_STEPS    = ['step-parse','step-vt','step-nlp','step-score'];
+
+function setStep(id, state) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('active','done','error');
+  if (state) el.classList.add(state);
+}
+function activateStep(id) { setStep(id,'active'); }
+function doneStep(id)     { setStep(id,'done'); }
+function errorStep(id)    { setStep(id,'error'); }
+function resetSteps() {
+  ['step-parse','step-vt','step-phish','step-nlp','step-score'].forEach(id => setStep(id,''));
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MAIN ANALYSIS
+══════════════════════════════════════════════════════════════ */
+function showError(msg) {
+  const el = document.getElementById('error-toast');
+  el.textContent = msg; el.classList.add('show');
+}
+function hideError() { document.getElementById('error-toast').classList.remove('show'); }
+
+async function runAnalysis() {
+  if (isAnalyzing) return;
+  if (!currentUser) return openAuthModal('login');
+
+  hideError(); hideEmlError();
+
+  if (currentChannel === 'email' && !uploadedEmlFile) {
+    const txt = document.getElementById('msg-input').value.trim();
+    if (!txt) return showError('Please upload a .eml file or paste message text.');
+  }
+
+  isAnalyzing = true;
+  const btn = document.getElementById('analyze-btn');
+  const btnText = document.getElementById('btn-text');
+  btn.disabled = true;
+  btnText.textContent = '⏳ Analyzing...';
+
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('progress-wrap').classList.add('show');
+  resetSteps();
+
+  ['verdict-card','score-breakdown','block-flags','block-nlp','block-vt','block-meta'].forEach(id => {
+    document.getElementById(id).classList.remove('show');
+  });
+  document.getElementById('reset-btn').classList.remove('show');
+  lastAnalysisId = null;
+
+  try {
+    let result;
+    if (currentChannel === 'email') {
+      result = await analyzeEmail();
+    } else {
+      result = await analyzeMessage();
+    }
+    renderResult(result);
+  } catch (e) {
+    showError(e.message || 'Analysis failed. Check the server logs.');
+    resetSteps();
+    document.getElementById('empty-state').style.display = '';
+  } finally {
+    isAnalyzing = false;
+    btn.disabled = false;
+    btnText.textContent = '🔍 ANALYZE MESSAGE';
+    document.getElementById('progress-wrap').classList.remove('show');
+  }
+}
+
+/* ── EMAIL analysis (calls /api/emails/analyze) ─────────────────────────── */
+async function analyzeEmail() {
+  activateStep('step-parse');
+  await delay(300);
+
+  const formData = new FormData();
+  if (uploadedEmlFile) {
+    formData.append('file', uploadedEmlFile);
+  } else {
+    // Wrap raw text as a .eml file
+    const blob = new Blob([document.getElementById('msg-input').value], { type: 'message/rfc822' });
+    formData.append('file', blob, 'message.eml');
+  }
+
+  doneStep('step-parse');
+  activateStep('step-vt');
+
+  const res = await fetch('/api/emails/analyze', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    if (res.status === 401) { logoutUser(); openAuthModal('login'); throw new Error('Session expired — please log in again.'); }
+    throw new Error(err.detail || `Server error ${res.status}`);
+  }
+
+  doneStep('step-vt');
+  activateStep('step-phish');
+  await delay(200);
+  doneStep('step-phish');
+  activateStep('step-nlp');
+  await delay(200);
+  doneStep('step-nlp');
+  activateStep('step-score');
+  await delay(200);
+  doneStep('step-score');
+
+  const data = await res.json();
+  lastAnalysisId = data.id;
+  return { ...data, _channel: 'email' };
+}
+
+/* ── MESSAGE analysis (calls /api/messages/analyze) ─────────────────────── */
+async function analyzeMessage() {
+  const content = document.getElementById('msg-input').value.trim();
+  if (!content) throw new Error('Please paste the message content.');
+
+  activateStep('step-parse');
+  await delay(200);
+  doneStep('step-parse');
+  activateStep('step-vt');
+
+  const sender = currentChannel === 'sms'
+    ? document.getElementById('field-sms-sender').value.trim()
+    : document.getElementById('field-wa-sender').value.trim();
+
+  const res = await fetch('/api/messages/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ channel: currentChannel, sender, content }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    if (res.status === 401) { logoutUser(); openAuthModal('login'); throw new Error('Session expired.'); }
+    throw new Error(err.detail || `Server error ${res.status}`);
+  }
+
+  doneStep('step-vt');
+  activateStep('step-nlp');
+  await delay(200);
+  doneStep('step-nlp');
+  activateStep('step-score');
+  await delay(200);
+  doneStep('step-score');
+
+  const data = await res.json();
+  return { ...data, _channel: currentChannel };
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* ══════════════════════════════════════════════════════════════
+   RENDER RESULT
+══════════════════════════════════════════════════════════════ */
+function getVerdictClass(score) {
+  if (score >= 60) return 'danger';
+  if (score >= 30) return 'warn';
+  return 'safe';
+}
+
+function renderResult(r) {
+  const score   = r.risk_score ?? 0;
+  const verdict = r.verdict ?? 'SAFE';
+  const vclass  = getVerdictClass(score);
+  const emojis  = { safe: '✅', warn: '⚠️', danger: '🚨' };
+  const msgs    = {
+    safe:   'This message appears legitimate. No significant threats were detected.',
+    warn:   'This message shows suspicious characteristics. Exercise caution before clicking links or sharing personal info.',
+    danger: 'HIGH RISK — This message shows strong phishing or scam indicators. Do not click any links or respond.',
+  };
+
+  // Verdict card
+  const vc = document.getElementById('verdict-card');
+  vc.className = `verdict-card show ${vclass}`;
+  document.getElementById('verdict-emoji').textContent = emojis[vclass];
+  document.getElementById('verdict-title').textContent = verdict;
+  document.getElementById('verdict-sub').textContent = r._channel?.toUpperCase() + ' ANALYSIS';
+  document.getElementById('verdict-score').textContent = Math.round(score);
+  document.getElementById('verdict-message').textContent = msgs[vclass];
+
+  // PDF button (email only)
+  const pdfBtn = document.getElementById('btn-pdf');
+  pdfBtn.style.display = (r._channel === 'email' && lastAnalysisId) ? '' : 'none';
+
+  // Score bars
+  const nlp = r.nlp_result ?? {};
+  const nlpContrib = nlp.is_spam ? Math.round(nlp.score * 30) : 0;
+  const flagScore  = Math.min(100, Math.round(score - nlpContrib));
+
+  document.getElementById('score-breakdown').classList.add('show');
+  document.getElementById('sb-tech-val').textContent = flagScore + ' pts';
+  document.getElementById('sb-tech-bar').style.width  = Math.min(flagScore, 100) + '%';
+  document.getElementById('sb-nlp-val').textContent  = nlpContrib + ' pts';
+  document.getElementById('sb-nlp-bar').style.width  = Math.min(nlpContrib * 3, 100) + '%';
+
+  // Phishing flags
+  document.getElementById('block-flags').classList.add('show');
+  const flagsBody = document.getElementById('body-flags');
+  flagsBody.innerHTML = '';
+  const flags = r.phishing_flags ?? [];
+  if (!flags.length) {
+    flagsBody.innerHTML = '<div class="detail-row"><span class="detail-row-val val-pass">✓ No phishing flags detected</span></div>';
+  } else {
+    flags.forEach(f => {
+      const row = document.createElement('div');
+      row.className = 'detail-row';
+      row.innerHTML = `<span class="detail-row-key val-fail">⚠</span><span class="detail-row-val">${f}</span>`;
+      flagsBody.appendChild(row);
+    });
+  }
+  toggleDetail('flags');
+
+  // NLP
+  document.getElementById('block-nlp').classList.add('show');
+  const nlpBody = document.getElementById('body-nlp');
+  nlpBody.innerHTML = '';
+  renderRows(nlpBody, [
+    { key: 'Classification', val: nlp.label ?? '—', status: nlp.is_spam ? 'fail' : 'pass' },
+    { key: 'Confidence', val: ((nlp.score ?? 0) * 100).toFixed(1) + '%', status: 'info' },
+    { key: 'Is Spam', val: nlp.is_spam ? 'YES' : 'NO', status: nlp.is_spam ? 'fail' : 'pass' },
+  ]);
+  toggleDetail('nlp');
+
+  // VirusTotal
+  const vtRaw = r.virustotal_data ?? {};
+  const vt = vtRaw.virustotal ?? {};
+  const vtLinks = (vt.links ?? r.vt_results ?? []);
+  const vtAtts  = vt.attachments ?? [];
+  if (vtLinks.length || vtAtts.length) {
+    document.getElementById('block-vt').classList.add('show');
+    const vtBody = document.getElementById('body-vt');
+    vtBody.innerHTML = '';
+    vtLinks.forEach(entry => {
+      const u = (entry.url ?? '').substring(0, 60) + (entry.url?.length > 60 ? '...' : '');
+      renderRows(vtBody, [
+        { key: 'URL', val: u, status: '' },
+        { key: 'Verdict', val: entry.verdict ?? '—', status: entry.verdict === 'clean' ? 'pass' : 'fail' },
+        { key: 'Malicious Votes', val: String(entry.malicious_votes ?? 0), status: entry.malicious_votes > 0 ? 'fail' : 'pass' },
+      ]);
+    });
+    vtAtts.forEach(entry => {
+      renderRows(vtBody, [
+        { key: 'File', val: entry.filename ?? '—', status: '' },
+        { key: 'Verdict', val: entry.verdict ?? '—', status: entry.verdict === 'clean' ? 'pass' : 'fail' },
+      ]);
+    });
+    toggleDetail('vt');
+  }
+
+  // Metadata (email only)
+  if (r._channel === 'email') {
+    document.getElementById('block-meta').classList.add('show');
+    const metaBody = document.getElementById('body-meta');
+    metaBody.innerHTML = '';
+    renderRows(metaBody, [
+      { key: 'Subject',   val: r.subject ?? '—',       status: '' },
+      { key: 'Sender',    val: r.sender_email ?? '—',  status: '' },
+      { key: 'Domain',    val: r.sender_domain ?? '—', status: '' },
+      { key: 'Recipient', val: r.recipient ?? '—',     status: '' },
+      { key: 'Timestamp', val: r.email_timestamp ?? '—', status: '' },
+    ]);
+    toggleDetail('meta');
+  }
+
+  addHistory(score, r._channel ?? currentChannel, r.subject ?? r.content_preview ?? '(no preview)');
+  document.getElementById('reset-btn').classList.add('show');
+}
+
+function renderRows(container, rows) {
+  rows.forEach(({ key, val, status }) => {
+    const row = document.createElement('div');
+    row.className = 'detail-row';
+    const cls = status === 'pass' ? 'val-pass' : status === 'fail' ? 'val-fail' : status === 'warn' ? 'val-warn' : status === 'info' ? 'val-info' : '';
+    row.innerHTML = `<span class="detail-row-key">${key}</span><span class="detail-row-val ${cls}">${val}</span>`;
+    container.appendChild(row);
+  });
+}
+
+function toggleDetail(id) {
+  const body = document.getElementById(`body-${id}`);
+  const header = body?.previousElementSibling;
+  if (!body) return;
+  const isOpen = body.classList.toggle('open');
+  if (header) header.classList.toggle('open', isOpen);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PDF DOWNLOAD
+══════════════════════════════════════════════════════════════ */
+async function downloadPDF() {
+  if (!lastAnalysisId) return;
+  const res = await fetch(`/api/emails/${lastAnalysisId}/pdf`, { headers: authHeaders() });
+  if (!res.ok) return showError('Could not generate PDF. Try again.');
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `tamenny_report_${lastAnalysisId}.pdf`;
+  a.click();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HISTORY
+══════════════════════════════════════════════════════════════ */
+function addHistory(score, channel, preview) {
+  const vclass = getVerdictClass(score);
+  const labels = { safe: 'SAFE', warn: 'SUSPICIOUS', danger: 'HIGH RISK' };
+  const icons  = { email: '📧', sms: '📱', whatsapp: '💬', telegram: '✈️' };
+  analysisHistory.unshift({ score, channel, vclass, label: labels[vclass], preview: String(preview).substring(0,60), icon: icons[channel] ?? '📨' });
+  renderHistoryList();
+}
+
+function filterHistory(f) {
+  currentHistoryFilter = f;
+  document.getElementById('hist-btn-all').className  = 'btn-hist-filter' + (f==='all'  ? ' active-all'  : '');
+  document.getElementById('hist-btn-spam').className = 'btn-hist-filter' + (f==='spam' ? ' active-spam' : '');
+  document.getElementById('hist-btn-legit').className= 'btn-hist-filter' + (f==='legit'? ' active-legit': '');
+  renderHistoryList();
+}
+
+function renderHistoryList() {
+  const list  = document.getElementById('history-list');
+  const noMsg = document.getElementById('no-history-msg');
+  list.querySelectorAll('.hist-item').forEach(el => el.remove());
+  if (!analysisHistory.length) { noMsg.style.display = ''; return; }
+  noMsg.style.display = 'none';
+  const f = currentHistoryFilter;
+  let visible = 0;
+  analysisHistory.slice(0,10).forEach(h => {
+    const isSpam  = h.vclass === 'warn' || h.vclass === 'danger';
+    const hidden  = (f === 'spam' && !isSpam) || (f === 'legit' && isSpam);
+    if (!hidden) visible++;
+    const div = document.createElement('div');
+    div.className = 'hist-item';
+    div.dataset.hidden = hidden ? 'true' : 'false';
+    div.innerHTML = `
+      <span class="hist-badge ${h.vclass}">${Math.round(h.score)}</span>
+      <div class="hist-info">
+        <div class="hist-channel">${h.icon} ${h.channel}</div>
+        <div class="hist-preview">${h.preview}</div>
+      </div>
+      <div class="hist-score ${h.vclass==='safe'?'val-pass':h.vclass==='warn'?'val-warn':'val-fail'}">${h.label}</div>`;
+    list.appendChild(div);
+  });
+  if (visible === 0) {
+    noMsg.style.display = '';
+    noMsg.textContent = f==='spam' ? 'No spam in history' : 'No legitimate messages in history';
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RESET
+══════════════════════════════════════════════════════════════ */
+function resetApp() {
+  document.getElementById('msg-input').value = '';
+  document.getElementById('field-sms-sender').value = '';
+  document.getElementById('field-wa-sender').value  = '';
+  clearEmlFile(); hideError();
+  setEmlControlsEnabled(true);
+  setMessageInputEnabled(true);
+  document.getElementById('empty-state').style.display = '';
+  document.getElementById('progress-wrap').classList.remove('show');
+  resetSteps();
+  ['verdict-card','score-breakdown','block-flags','block-nlp','block-vt','block-meta'].forEach(id => {
+    document.getElementById(id).classList.remove('show');
+  });
+  document.getElementById('reset-btn').classList.remove('show');
+  lastAnalysisId = null;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   INIT — restore session token on page load
+══════════════════════════════════════════════════════════════ */
+(async function init() {
+  loadToken();
+  if (authToken) {
+    try {
+      const res = await fetch('/api/users/me', { headers: authHeaders() });
+      if (res.ok) {
+        const user = await res.json();
+        setLoggedIn(user.username);
+      } else {
+        clearToken();
+      }
+    } catch (_) { clearToken(); }
+  }
+})();
+</script>
+</body>
+</html>
