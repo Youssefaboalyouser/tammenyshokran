@@ -343,13 +343,16 @@ input[type="text"]::placeholder, input[type="email"]::placeholder, input[type="p
         <button class="btn-hist-filter active-all" id="hist-btn-all" onclick="filterHistory('all')">All</button>
         <button class="btn-hist-filter" id="hist-btn-spam" onclick="filterHistory('spam')">🚨 Spam</button>
         <button class="btn-hist-filter" id="hist-btn-legit" onclick="filterHistory('legit')">✅ Legitimate</button>
-        <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
-          <label for="history-limit" style="font-family:var(--mono); font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em;">Load</label>
-          <input id="history-limit" type="number" min="1" max="20" value="4" style="width:58px; background:var(--panel2); border:1px solid var(--border); color:var(--text); padding:8px 10px; font-family:var(--mono); font-size:0.78rem;" onchange="onHistoryLimitChange()" />
-        </div>
       </div>
       <div class="history-list" id="history-list">
         <div class="no-history" id="no-history-msg">No analyses yet for this account</div>
+      </div>
+      <div class="history-pagination" id="history-pagination" style="display:none; margin-top:16px; text-align:center; font-family:var(--mono); font-size:0.75rem; color:var(--text-dim); display:flex; align-items:center; justify-content:center; gap:6px;">
+        <button id="pag-prev" onclick="goToPage(currentPage - 1)" style="background:var(--panel2); border:1px solid var(--border); color:var(--text-dim); padding:4px 8px; cursor:pointer; font-family:var(--mono); font-size:0.7rem;">◀</button>
+        <div id="pag-numbers" style="display:flex; gap:4px; align-items:center;">
+          <!-- Page numbers will be inserted here -->
+        </div>
+        <button id="pag-next" onclick="goToPage(currentPage + 1)" style="background:var(--panel2); border:1px solid var(--border); color:var(--text-dim); padding:4px 8px; cursor:pointer; font-family:var(--mono); font-size:0.7rem;">▶</button>
       </div>
     </div>
   </div>
@@ -440,21 +443,13 @@ let currentUser = null;
 let uploadedEmlFile = null;
 let lastAnalysisId = null;   // DB id for PDF download
 let authToken = null;
-let emailHistoryLimit = 4;
 const HISTORY_LIMIT_KEY = 'tamenny_history_limit';
+const ITEMS_PER_PAGE = 3;
+let currentPage = 1;
+let totalPages = 1;
 
 function loadHistoryLimit() {
-  const saved = sessionStorage.getItem(HISTORY_LIMIT_KEY);
-  if (saved) {
-    const value = Number(saved);
-    if (!Number.isNaN(value) && value >= 1 && value <= 100) {
-      emailHistoryLimit = value;
-    }
-  }
-  const input = document.getElementById('history-limit');
-  if (input) {
-    input.value = emailHistoryLimit;
-  }
+  // No longer needed - pagination replaced the limit box
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -551,7 +546,7 @@ async function submitLogin() {
       const me = await fetch('/api/users/me', { headers: authHeaders() });
       const user = me.ok ? await me.json() : { username: email.split('@')[0] };
       setLoggedIn(user.username);
-      await fetchEmailHistory(emailHistoryLimit);
+      await fetchEmailHistory(100);
       closeAuthModal();
     } else {
       const err = await res.json().catch(() => ({}));
@@ -602,7 +597,7 @@ async function submitSignup() {
         saveToken(data.access_token);
       }
       setLoggedIn(username);
-      await fetchEmailHistory(emailHistoryLimit);
+      await fetchEmailHistory(100);
       closeAuthModal();
     } else {
       const err = await res.json().catch(() => ({}));
@@ -1060,19 +1055,13 @@ function addHistory(score, channel, preview, analysisId = null) {
 }
 
 function onHistoryLimitChange() {
-  const input = document.getElementById('history-limit');
-  const value = Number(input.value) || 4;
-  emailHistoryLimit = Math.min(Math.max(value, 1), 20);
-  input.value = emailHistoryLimit;
-  sessionStorage.setItem(HISTORY_LIMIT_KEY, String(emailHistoryLimit));
-  if (currentUser) {
-    fetchEmailHistory(emailHistoryLimit);
-  }
+  // Deprecated - pagination replaced this
 }
 
-async function fetchEmailHistory(limit = 4) {
+async function fetchEmailHistory(limit = 100) {
   if (!authToken) return;
   try {
+    // Fetch all history (using high limit to get everything)
     const res = await fetch(`/api/emails/?limit=${limit}`, {
       method: 'GET',
       headers: authHeaders(),
@@ -1091,6 +1080,8 @@ async function fetchEmailHistory(limit = 4) {
       createdAt: item.created_at,
     })).filter(item => !existingIds.has(item.analysisId));
     analysisHistory = [...emailRows, ...analysisHistory.filter(item => !item.analysisId)];
+    currentPage = 1;
+    totalPages = Math.ceil(analysisHistory.length / ITEMS_PER_PAGE);
     renderHistoryList();
   } catch (err) {
     console.warn('Could not load email history', err);
@@ -1111,15 +1102,34 @@ function renderHistoryList() {
   list.querySelectorAll('.hist-item').forEach(el => el.remove());
   if (!analysisHistory.length) { noMsg.style.display = ''; return; }
   noMsg.style.display = 'none';
+  
   const f = currentHistoryFilter;
   let visible = 0;
-  analysisHistory.slice(0, emailHistoryLimit).forEach(h => {
-    const isSpam  = h.vclass === 'warn' || h.vclass === 'danger';
-    const hidden  = (f === 'spam' && !isSpam) || (f === 'legit' && isSpam);
+  
+  // Filter by current filter type
+  const filtered = analysisHistory.filter(h => {
+    const isSpam = h.vclass === 'warn' || h.vclass === 'danger';
+    const hidden = (f === 'spam' && !isSpam) || (f === 'legit' && isSpam);
     if (!hidden) visible++;
+    return !hidden;
+  });
+  
+  // Calculate pagination
+  totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+  
+  const start = (currentPage - 1) * ITEMS_PER_PAGE;
+  const end = start + ITEMS_PER_PAGE;
+  const pageItems = filtered.slice(start, end);
+  
+  // Render pagination controls
+  renderPaginationControls(totalPages);
+  
+  // Render history items for this page
+  pageItems.forEach(h => {
     const div = document.createElement('div');
     div.className = 'hist-item';
-    div.dataset.hidden = hidden ? 'true' : 'false';
     if (h.analysisId) {
       div.dataset.analysisId = h.analysisId;
       div.style.cursor = 'pointer';
@@ -1135,10 +1145,75 @@ function renderHistoryList() {
       <div class="hist-score ${h.vclass==='safe'?'val-pass':h.vclass==='warn'?'val-warn':'val-fail'}">${h.label}</div>`;
     list.appendChild(div);
   });
+  
   if (visible === 0) {
     noMsg.style.display = '';
     noMsg.textContent = f==='spam' ? 'No spam in history' : 'No legitimate messages in history';
   }
+}
+
+function renderPaginationControls(totalPages) {
+  const paginationDiv = document.getElementById('history-pagination');
+  const paginationNumbers = document.getElementById('pag-numbers');
+  
+  if (totalPages <= 1) {
+    paginationDiv.style.display = 'none';
+    return;
+  }
+  
+  paginationDiv.style.display = 'flex';
+  paginationNumbers.innerHTML = '';
+  
+  // Determine which page numbers to show
+  let startPage = Math.max(1, currentPage - 1);
+  let endPage = Math.min(totalPages, currentPage + 1);
+  if (endPage - startPage < 2) {
+    if (startPage === 1) endPage = Math.min(totalPages, 3);
+    else startPage = Math.max(1, endPage - 2);
+  }
+  
+  // Add "..." if needed at start
+  if (startPage > 1) {
+    const dot = document.createElement('span');
+    dot.textContent = '...';
+    dot.style.color = 'var(--text-dim)';
+    paginationNumbers.appendChild(dot);
+  }
+  
+  // Add page numbers
+  for (let i = startPage; i <= endPage; i++) {
+    const btn = document.createElement('button');
+    btn.textContent = i;
+    btn.style.padding = '4px 8px';
+    btn.style.border = i === currentPage ? '1px solid var(--cyan)' : '1px solid var(--border)';
+    btn.style.background = i === currentPage ? 'var(--cyan-dim)' : 'var(--panel2)';
+    btn.style.color = i === currentPage ? 'var(--cyan)' : 'var(--text-dim)';
+    btn.style.cursor = 'pointer';
+    btn.style.fontFamily = 'var(--mono)';
+    btn.style.fontSize = '0.7rem';
+    btn.onclick = () => goToPage(i);
+    paginationNumbers.appendChild(btn);
+  }
+  
+  // Add "..." if needed at end
+  if (endPage < totalPages) {
+    const dot = document.createElement('span');
+    dot.textContent = '...';
+    dot.style.color = 'var(--text-dim)';
+    paginationNumbers.appendChild(dot);
+  }
+  
+  // Update prev/next buttons
+  document.getElementById('pag-prev').disabled = currentPage === 1;
+  document.getElementById('pag-next').disabled = currentPage === totalPages;
+  document.getElementById('pag-prev').style.opacity = currentPage === 1 ? '0.5' : '1';
+  document.getElementById('pag-next').style.opacity = currentPage === totalPages ? '0.5' : '1';
+}
+
+function goToPage(page) {
+  if (page < 1 || page > totalPages) return;
+  currentPage = page;
+  renderHistoryList();
 }
 
 async function loadHistoryAnalysis(analysisId) {
@@ -1192,7 +1267,7 @@ function resetApp() {
       if (res.ok) {
         const user = await res.json();
         setLoggedIn(user.username);
-        await fetchEmailHistory(emailHistoryLimit);
+        await fetchEmailHistory(100);
       } else {
         clearToken();
       }
