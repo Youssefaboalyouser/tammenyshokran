@@ -441,6 +441,21 @@ let uploadedEmlFile = null;
 let lastAnalysisId = null;   // DB id for PDF download
 let authToken = null;
 let emailHistoryLimit = 4;
+const HISTORY_LIMIT_KEY = 'tamenny_history_limit';
+
+function loadHistoryLimit() {
+  const saved = sessionStorage.getItem(HISTORY_LIMIT_KEY);
+  if (saved) {
+    const value = Number(saved);
+    if (!Number.isNaN(value) && value >= 1 && value <= 100) {
+      emailHistoryLimit = value;
+    }
+  }
+  const input = document.getElementById('history-limit');
+  if (input) {
+    input.value = emailHistoryLimit;
+  }
+}
 
 /* ══════════════════════════════════════════════════════════════
    TOKEN STORAGE
@@ -474,10 +489,16 @@ function closeAuthModal() {
 document.getElementById('auth-modal').addEventListener('click', function(e) {
   if (e.target === this) closeAuthModal();
 });
+function clearLoginForm() {
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+}
+
 function showLoginView() {
   document.getElementById('view-login').style.display = '';
   document.getElementById('view-signup').style.display = 'none';
   clearAuthErrors();
+  clearLoginForm();
 }
 function showSignupView() {
   document.getElementById('view-login').style.display = 'none';
@@ -610,6 +631,7 @@ function logoutUser() {
   document.getElementById('btn-login-header').style.display = '';
   document.getElementById('user-badge').classList.remove('show');
   resetApp();
+  clearLoginForm();
   analysisHistory = [];
   renderHistoryList();
 }
@@ -980,7 +1002,9 @@ function renderResult(r, { skipHistory = false } = {}) {
     toggleDetail('meta');
   }
 
-  addHistory(score, r._channel ?? currentChannel, r.subject ?? r.content_preview ?? '(no preview)', r.id ?? null);
+  if (!skipHistory) {
+    addHistory(score, r._channel ?? currentChannel, r.subject ?? r.content_preview ?? '(no preview)', r.id ?? null);
+  }
   document.getElementById('reset-btn').classList.add('show');
 }
 
@@ -1040,6 +1064,7 @@ function onHistoryLimitChange() {
   const value = Number(input.value) || 4;
   emailHistoryLimit = Math.min(Math.max(value, 1), 20);
   input.value = emailHistoryLimit;
+  sessionStorage.setItem(HISTORY_LIMIT_KEY, String(emailHistoryLimit));
   if (currentUser) {
     fetchEmailHistory(emailHistoryLimit);
   }
@@ -1088,7 +1113,7 @@ function renderHistoryList() {
   noMsg.style.display = 'none';
   const f = currentHistoryFilter;
   let visible = 0;
-  analysisHistory.slice(0,10).forEach(h => {
+  analysisHistory.slice(0, emailHistoryLimit).forEach(h => {
     const isSpam  = h.vclass === 'warn' || h.vclass === 'danger';
     const hidden  = (f === 'spam' && !isSpam) || (f === 'legit' && isSpam);
     if (!hidden) visible++;
@@ -1160,6 +1185,7 @@ function resetApp() {
 ══════════════════════════════════════════════════════════════ */
 (async function init() {
   loadToken();
+  loadHistoryLimit();
   if (authToken) {
     try {
       const res = await fetch('/api/users/me', { headers: authHeaders() });
