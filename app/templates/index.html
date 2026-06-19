@@ -1073,7 +1073,7 @@ function onHistoryLimitChange() {
 async function fetchEmailHistory(limit = 4) {
   if (!authToken) return;
   try {
-    const res = await fetch(`/api/emails?limit=${limit}`, {
+    const res = await fetch(`/api/emails/?limit=${limit}`, {
       method: 'GET',
       headers: authHeaders(),
     });

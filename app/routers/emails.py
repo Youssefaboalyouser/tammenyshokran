@@ -144,6 +144,7 @@ async def analyze_eml(
 
 # ── List user's email analyses ────────────────────────────────────────────────
 
+@router.get("", response_model=List[schemas.EmailListItem])
 @router.get("/", response_model=List[schemas.EmailListItem])
 def list_analyses(
     verdict_filter: Optional[str] = Query(None, description="SAFE | SUSPICIOUS | HIGH RISK"),
@@ -157,8 +158,10 @@ def list_analyses(
     )
     if verdict_filter:
         query = query.filter(models.EmailAnalysis.verdict == verdict_filter.upper())
+    # Return the earliest N analyses (oldest first) so the frontend's
+    # "Load" control can request the earliest activities in the account.
     return (
-        query.order_by(models.EmailAnalysis.created_at.desc())
+        query.order_by(models.EmailAnalysis.created_at.asc())
         .offset(skip)
         .limit(limit)
         .all()
