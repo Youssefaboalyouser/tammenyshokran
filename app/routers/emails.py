@@ -4,6 +4,7 @@ Handles .eml upload, full analysis pipeline, history, and PDF download.
 """
 
 import asyncio
+import hashlib
 from typing import Optional, List
 from fastapi import (
     APIRouter, Depends, HTTPException, UploadFile, File,
@@ -55,6 +56,17 @@ async def analyze_eml(
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="File exceeds 10 MB limit",
+        )
+
+    file_hash = hashlib.sha256(raw_bytes).hexdigest()
+    duplicate = db.query(models.EmailAnalysis).filter(
+        models.EmailAnalysis.owner_id == current_user.id,
+        models.EmailAnalysis.file_hash == file_hash,
+    ).first()
+    if duplicate:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This .eml file has already been uploaded",
         )
 
     # ── Step 1: Parse EML ────────────────────────────────────────────────────
@@ -110,6 +122,7 @@ async def analyze_eml(
     record = models.EmailAnalysis(
         owner_id=current_user.id,
         filename=file.filename,
+        file_hash=file_hash,
         email_id=parsed.get("email_id"),
         sender_email=sender.get("email"),
         sender_domain=sender.get("domain"),
@@ -134,7 +147,7 @@ async def analyze_eml(
 @router.get("/", response_model=List[schemas.EmailListItem])
 def list_analyses(
     verdict_filter: Optional[str] = Query(None, description="SAFE | SUSPICIOUS | HIGH RISK"),
-    limit: int = Query(20, le=100),
+    limit: int = Query(4, le=100),
     skip: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),

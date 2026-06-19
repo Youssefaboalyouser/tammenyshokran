@@ -343,9 +343,13 @@ input[type="text"]::placeholder, input[type="email"]::placeholder, input[type="p
         <button class="btn-hist-filter active-all" id="hist-btn-all" onclick="filterHistory('all')">All</button>
         <button class="btn-hist-filter" id="hist-btn-spam" onclick="filterHistory('spam')">🚨 Spam</button>
         <button class="btn-hist-filter" id="hist-btn-legit" onclick="filterHistory('legit')">✅ Legitimate</button>
+        <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+          <label for="history-limit" style="font-family:var(--mono); font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em;">Load</label>
+          <input id="history-limit" type="number" min="1" max="20" value="4" style="width:58px; background:var(--panel2); border:1px solid var(--border); color:var(--text); padding:8px 10px; font-family:var(--mono); font-size:0.78rem;" onchange="onHistoryLimitChange()" />
+        </div>
       </div>
       <div class="history-list" id="history-list">
-        <div class="no-history" id="no-history-msg">No analyses yet this session</div>
+        <div class="no-history" id="no-history-msg">No analyses yet for this account</div>
       </div>
     </div>
   </div>
@@ -436,6 +440,7 @@ let currentUser = null;
 let uploadedEmlFile = null;
 let lastAnalysisId = null;   // DB id for PDF download
 let authToken = null;
+let emailHistoryLimit = 4;
 
 /* ══════════════════════════════════════════════════════════════
    TOKEN STORAGE
@@ -525,6 +530,7 @@ async function submitLogin() {
       const me = await fetch('/api/users/me', { headers: authHeaders() });
       const user = me.ok ? await me.json() : { username: email.split('@')[0] };
       setLoggedIn(user.username);
+      await fetchEmailHistory(emailHistoryLimit);
       closeAuthModal();
     } else {
       const err = await res.json().catch(() => ({}));
@@ -575,6 +581,7 @@ async function submitSignup() {
         saveToken(data.access_token);
       }
       setLoggedIn(username);
+      await fetchEmailHistory(emailHistoryLimit);
       closeAuthModal();
     } else {
       const err = await res.json().catch(() => ({}));
@@ -602,6 +609,9 @@ function logoutUser() {
   currentUser = null;
   document.getElementById('btn-login-header').style.display = '';
   document.getElementById('user-badge').classList.remove('show');
+  resetApp();
+  analysisHistory = [];
+  renderHistoryList();
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -670,6 +680,9 @@ function processEmlFile(file) {
   hideEmlError();
   if (!file.name.endsWith('.eml')) return showEmlError('Only .eml files are accepted.');
   if (file.size > 10 * 1024 * 1024) return showEmlError('File must be under 10 MB.');
+  if (uploadedEmlFile && uploadedEmlFile.name === file.name && uploadedEmlFile.size === file.size && uploadedEmlFile.lastModified === file.lastModified) {
+    return showEmlError('This file has already been selected.');
+  }
   uploadedEmlFile = file;
   document.getElementById('eml-file-name').textContent = file.name;
   document.getElementById('eml-file-size').textContent = (file.size / 1024).toFixed(1) + ' KB';
@@ -863,7 +876,7 @@ function getVerdictClass(score) {
   return 'safe';
 }
 
-function renderResult(r) {
+function renderResult(r, { skipHistory = false } = {}) {
   const score   = r.risk_score ?? 0;
   const verdict = r.verdict ?? 'SAFE';
   const vclass  = getVerdictClass(score);
@@ -967,7 +980,7 @@ function renderResult(r) {
     toggleDetail('meta');
   }
 
-  addHistory(score, r._channel ?? currentChannel, r.subject ?? r.content_preview ?? '(no preview)');
+  addHistory(score, r._channel ?? currentChannel, r.subject ?? r.content_preview ?? '(no preview)', r.id ?? null);
   document.getElementById('reset-btn').classList.add('show');
 }
 
@@ -1006,12 +1019,57 @@ async function downloadPDF() {
 /* ══════════════════════════════════════════════════════════════
    HISTORY
 ══════════════════════════════════════════════════════════════ */
-function addHistory(score, channel, preview) {
+function addHistory(score, channel, preview, analysisId = null) {
   const vclass = getVerdictClass(score);
   const labels = { safe: 'SAFE', warn: 'SUSPICIOUS', danger: 'HIGH RISK' };
   const icons  = { email: '📧', sms: '📱', whatsapp: '💬', telegram: '✈️' };
-  analysisHistory.unshift({ score, channel, vclass, label: labels[vclass], preview: String(preview).substring(0,60), icon: icons[channel] ?? '📨' });
+  analysisHistory.unshift({
+    score,
+    channel,
+    vclass,
+    label: labels[vclass],
+    preview: String(preview).substring(0,60),
+    icon: icons[channel] ?? '📨',
+    analysisId,
+  });
   renderHistoryList();
+}
+
+function onHistoryLimitChange() {
+  const input = document.getElementById('history-limit');
+  const value = Number(input.value) || 4;
+  emailHistoryLimit = Math.min(Math.max(value, 1), 20);
+  input.value = emailHistoryLimit;
+  if (currentUser) {
+    fetchEmailHistory(emailHistoryLimit);
+  }
+}
+
+async function fetchEmailHistory(limit = 4) {
+  if (!authToken) return;
+  try {
+    const res = await fetch(`/api/emails?limit=${limit}`, {
+      method: 'GET',
+      headers: authHeaders(),
+    });
+    if (!res.ok) return;
+    const rows = await res.json();
+    const existingIds = new Set(analysisHistory.filter(item => item.analysisId).map(item => item.analysisId));
+    const emailRows = rows.map(item => ({
+      score: item.risk_score ?? 0,
+      channel: 'email',
+      preview: item.subject || item.filename || item.sender_email || 'Email analysis',
+      vclass: getVerdictClass(item.risk_score ?? 0),
+      label: item.verdict || 'UNKNOWN',
+      icon: '📧',
+      analysisId: item.id,
+      createdAt: item.created_at,
+    })).filter(item => !existingIds.has(item.analysisId));
+    analysisHistory = [...emailRows, ...analysisHistory.filter(item => !item.analysisId)];
+    renderHistoryList();
+  } catch (err) {
+    console.warn('Could not load email history', err);
+  }
 }
 
 function filterHistory(f) {
@@ -1037,6 +1095,12 @@ function renderHistoryList() {
     const div = document.createElement('div');
     div.className = 'hist-item';
     div.dataset.hidden = hidden ? 'true' : 'false';
+    if (h.analysisId) {
+      div.dataset.analysisId = h.analysisId;
+      div.style.cursor = 'pointer';
+      div.title = 'Click to restore this email analysis';
+      div.addEventListener('click', () => loadHistoryAnalysis(h.analysisId));
+    }
     div.innerHTML = `
       <span class="hist-badge ${h.vclass}">${Math.round(h.score)}</span>
       <div class="hist-info">
@@ -1049,6 +1113,25 @@ function renderHistoryList() {
   if (visible === 0) {
     noMsg.style.display = '';
     noMsg.textContent = f==='spam' ? 'No spam in history' : 'No legitimate messages in history';
+  }
+}
+
+async function loadHistoryAnalysis(analysisId) {
+  if (!authToken || !analysisId) return;
+  try {
+    const res = await fetch(`/api/emails/${analysisId}`, {
+      method: 'GET',
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      if (res.status === 401) { logoutUser(); openAuthModal('login'); }
+      return;
+    }
+    const data = await res.json();
+    lastAnalysisId = data.id;
+    renderResult({ ...data, _channel: 'email' }, { skipHistory: true });
+  } catch (err) {
+    console.warn('Could not load analysis from history', err);
   }
 }
 
@@ -1083,6 +1166,7 @@ function resetApp() {
       if (res.ok) {
         const user = await res.json();
         setLoggedIn(user.username);
+        await fetchEmailHistory(emailHistoryLimit);
       } else {
         clearToken();
       }

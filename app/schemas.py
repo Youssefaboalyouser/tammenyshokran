@@ -53,6 +53,8 @@ class EmailAnalysisResponse(BaseModel):
     subject: Optional[str]
     recipient: Optional[str]
     email_timestamp: Optional[str]
+    parsed_data: Optional[Any]
+    virustotal_data: Optional[Any]
     phishing_flags: Optional[list]
     nlp_result: Optional[dict]
     risk_score: Optional[float]

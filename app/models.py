@@ -31,6 +31,7 @@ class EmailAnalysis(Base):
     # File metadata
     filename = Column(String(255), nullable=True)
     email_id = Column(String(36), nullable=True)  # UUID from parser
+    file_hash = Column(String(64), nullable=True, index=True)
 
     # Parsed email fields (snapshot)
     sender_email = Column(String(255), nullable=True)
