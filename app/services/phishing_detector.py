@@ -425,33 +425,73 @@ def compute_risk_score(flags: list[str], nlp_is_spam: bool, nlp_score: float) ->
     This score is the primary decision input for the final verdict.
     """
     FLAG_WEIGHTS = {
-        "SPF failed": 8,
-        "DKIM failed": 8,
-        "DMARC failed": 10,
-        "SPF missing": 4,
-        "Reply-To domain mismatch": 12,
-        "Possible typosquatting domain detected": 15,
-        "Free email used for organizational communication": 5,
-        "Malicious link detected by VirusTotal": 25,
-        "Malicious attachment detected by VirusTotal": 25,
-        "High-risk attachment type": 12,
-        "Anchor text mismatch detected": 10,
-        "Suspicious URL (IP address used)": 8,
-        "URL shortener used": 6,
-        "Embedded base64 image detected": 5,
-        "Hidden text detected in HTML": 8,
+        # === Tier 1: Strong Indicators ===
+        "Malicious link detected by VirusTotal": 40,
+        "Malicious attachment detected by VirusTotal": 40,
+        "Possible typosquatting domain detected": 25,
+
+        # === Tier 2: Medium Indicators ===
+        "DMARC failed": 12,
+        "SPF failed": 10,
+        "DKIM failed": 10,
+        "Reply-To domain mismatch": 10,
+        "Sender domain does not match link domain": 9,
+        "High-risk attachment type": 10,
         "Suspicious sending infrastructure": 10,
+        "Missing reverse DNS": 6,
+        "Suspicious URL (IP address used)": 8,
+        "Anchor text mismatch detected": 8,
+        "Hidden text detected in HTML": 6,
+
+        # === Tier 3: Weak Indicators ===
+        "SPF missing": 3,
+        "Free email used for organizational communication": 3,
+        "URL shortener used": 4,
+        "Suspicious long URL": 4,
+        "Unverified link (no reputation data)": 3,
+        "Embedded base64 image detected": 3,
     }
 
     base_score = 0.0
     for flag in flags:
+        matched = False
         for key, weight in FLAG_WEIGHTS.items():
             if flag.startswith(key):
                 base_score += weight
+                matched = True
                 break
-        else:
+        if not matched:
             base_score += 3  # generic unknown flag
 
+    # Combination boosts: increase score when specific combinations appear
+    # Use substring checks to account for flags that include extra context
+    flag_text = "\n".join(flags)
+    def has(sub: str) -> bool:
+        return sub in flag_text
+
+    # Hidden text + Anchor mismatch => boost
+    if has("Hidden text detected in HTML") and has("Anchor text mismatch detected"):
+        base_score += 10
+
+    # Authentication collapse: SPF + DKIM + DMARC failed
+    if has("SPF failed") and has("DKIM failed") and has("DMARC failed"):
+        base_score += 15
+
+    # URL shortener used together with anchor mismatch
+    if has("URL shortener used") and has("Anchor text mismatch detected"):
+        base_score += 8
+
+    # Free email used for org communication + Reply-To mismatch
+    if has("Free email used for organizational communication") and has("Reply-To domain mismatch"):
+        base_score += 8
+    if has("Sender domain does not match link domain") and has("Anchor text mismatch detected"):
+        base_score += 10
+    if has("Unverified link (no reputation data)") and has("Suspicious long URL"):
+        base_score += 6
+    if has("Missing reverse DNS") and has("Suspicious sending infrastructure"):
+        base_score += 8
+    if has("Sender domain does not match link domain") and has("Unverified link (no reputation data)"):
+        base_score += 7
     # NLP contribution (max 30 points)
     if nlp_is_spam:
         base_score += nlp_score * 30
@@ -463,8 +503,12 @@ def verdict_from_score(score: float) -> str:
     """
     Convert a computed risk score into a final verdict label.
     """
-    if score >= 60:
-        return "HIGH RISK"
-    elif score >= 30:
+    # New thresholds requested:
+    # 0 – 25   -> SAFE
+    # 25 – 55  -> SUSPICIOUS
+    # 55+     -> SPAM
+    if score >= 55:
+        return "High Risk"
+    elif score >= 25:
         return "SUSPICIOUS"
     return "SAFE"
