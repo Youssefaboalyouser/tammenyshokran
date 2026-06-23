@@ -16,10 +16,12 @@ import json
 from pathlib import Path
 from typing import Optional
 
+import chardet
+
 # Lazy imports — only loaded when needed so the server starts fast
 # even if torch/transformers are slow to import.
 _pipeline = None
-_FINE_TUNED_PATH = Path(__file__).parent.parent / "data" / "nlp_model"
+_FINE_TUNED_PATH = Path(__file__).parent.parent / "data" / "nlp_model_v2"
 _BASE_MODEL = "mrm8488/bert-tiny-finetuned-sms-spam-detection"
 
 
@@ -133,7 +135,10 @@ def fine_tune(
     # ── Load CSV ─────────────────────────────────────────────────────────────
     print("[Fine-tune] Loading dataset...")
     rows = []
-    with open(csv_path, newline="", encoding="utf-8") as f:
+    with open(csv_path, "rb") as f:
+        raw = f.read(10000)
+        encoding = chardet.detect(raw)["encoding"]
+    with open(csv_path, newline="", encoding=encoding,errors="replace") as f:
         reader = csv.reader(f)
         for row in reader:
             if len(row) < 2:
@@ -164,8 +169,10 @@ def fine_tune(
     test_ds = Dataset.from_pandas(test_df.reset_index(drop=True))
 
     # ── Tokenizer ────────────────────────────────────────────────────────────
-    print(f"[Fine-tune] Loading tokenizer from {_BASE_MODEL}...")
-    tokenizer = AutoTokenizer.from_pretrained(_BASE_MODEL)
+    # Always load tokenizer from the base model for fresh fine-tuning.
+    tokenizer_source = _BASE_MODEL
+    print(f"[Fine-tune] Loading tokenizer from {tokenizer_source}...")
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_source)
 
     def tokenize(batch):
         return tokenizer(
@@ -179,9 +186,11 @@ def fine_tune(
     test_ds = test_ds.map(tokenize, batched=True)
 
     # ── Model ────────────────────────────────────────────────────────────────
-    print(f"[Fine-tune] Loading model from {_BASE_MODEL}...")
+    # Always start fine-tuning from the base model, not a previously saved local checkpoint.
+    model_source = _BASE_MODEL
+    print(f"[Fine-tune] Loading model from {model_source}...")
     model = AutoModelForSequenceClassification.from_pretrained(
-        _BASE_MODEL, num_labels=2, ignore_mismatched_sizes=True
+        model_source, num_labels=2, ignore_mismatched_sizes=True
     )
 
     # ── Training ─────────────────────────────────────────────────────────────
@@ -192,11 +201,10 @@ def fine_tune(
         per_device_eval_batch_size=batch_size,
         learning_rate=learning_rate,
         weight_decay=0.01,
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
-        logging_dir=os.path.join(output_dir, "logs"),
         logging_steps=50,
         fp16=torch.cuda.is_available(),
         report_to="none",
@@ -209,7 +217,6 @@ def fine_tune(
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=test_ds,
-        tokenizer=tokenizer,
         data_collator=data_collator,
     )
 
