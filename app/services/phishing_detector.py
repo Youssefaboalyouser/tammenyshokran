@@ -492,9 +492,9 @@ def compute_risk_score(flags: list[str], nlp_is_spam: bool, nlp_score: float) ->
         base_score += 8
     if has("Sender domain does not match link domain") and has("Unverified link (no reputation data)"):
         base_score += 7
-    # NLP contribution (max 30 points)
+    # NLP contribution (max 15 points), rule detection carries the remaining weight.
     if nlp_is_spam:
-        base_score += nlp_score * 30
+        base_score += nlp_score * 15
 
     return min(round(base_score, 1), 100.0)
 
@@ -504,11 +504,11 @@ def verdict_from_score(score: float) -> str:
     Convert a computed risk score into a final verdict label.
     """
     # New thresholds requested:
-    # 0 – 25   -> SAFE
-    # 25 – 55  -> SUSPICIOUS
-    # 55+     -> SPAM
-    if score >= 55:
+    # 0 – 29   -> SAFE
+    # 30 – 59  -> SUSPICIOUS
+    # 60+     -> HIGH RISK
+    if score >= 60:
         return "High Risk"
-    elif score >= 25:
+    elif score >= 30:
         return "SUSPICIOUS"
     return "SAFE"

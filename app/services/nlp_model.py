@@ -21,7 +21,9 @@ import chardet
 # Lazy imports — only loaded when needed so the server starts fast
 # even if torch/transformers are slow to import.
 _pipeline = None
-_FINE_TUNED_PATH = Path(__file__).parent.parent / "data" / "nlp_model_v2"
+_FINE_TUNED_PATH = Path(__file__).parent.parent / "data" / "nlp_model_v5"
+_CONTINUE_FROM_PATH = _FINE_TUNED_PATH
+_NEW_MODEL_PATH = Path(__file__).parent.parent / "data" / "nlp_model_v5"
 _BASE_MODEL = "mrm8488/bert-tiny-finetuned-sms-spam-detection"
 
 
@@ -33,8 +35,13 @@ def _get_pipeline():
 
     from transformers import pipeline as hf_pipeline
 
-    # Prefer fine-tuned local model if it exists
-    model_path = str(_FINE_TUNED_PATH) if _FINE_TUNED_PATH.exists() else _BASE_MODEL
+    # Prefer the newest local fine-tuned model if it exists.
+    if _NEW_MODEL_PATH.exists():
+        model_path = str(_NEW_MODEL_PATH)
+    elif _FINE_TUNED_PATH.exists():
+        model_path = str(_FINE_TUNED_PATH)
+    else:
+        model_path = _BASE_MODEL
     print(f"[NLP] Loading model from: {model_path}")
 
     _pipeline = hf_pipeline(
@@ -109,7 +116,7 @@ def fine_tune(
     Args:
         csv_path:      Path to your CSV file.
         output_dir:    Where to save the fine-tuned model.
-                       Defaults to app/data/nlp_model/.
+                       Defaults to app/data/nlp_model_v3/.
         epochs:        Number of training epochs.
         batch_size:    Training batch size.
         max_length:    Max token length.
@@ -129,7 +136,7 @@ def fine_tune(
     )
     from datasets import Dataset
 
-    output_dir = output_dir or str(_FINE_TUNED_PATH)
+    output_dir = output_dir or str(_NEW_MODEL_PATH)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     # ── Load CSV ─────────────────────────────────────────────────────────────
@@ -169,8 +176,9 @@ def fine_tune(
     test_ds = Dataset.from_pandas(test_df.reset_index(drop=True))
 
     # ── Tokenizer ────────────────────────────────────────────────────────────
-    # Always load tokenizer from the base model for fresh fine-tuning.
-    tokenizer_source = _BASE_MODEL
+    # Always start fine-tuning from the base model instead of any existing local checkpoint.
+    # tokenizer_source = str(_CONTINUE_FROM_PATH) if _CONTINUE_FROM_PATH.exists() else _BASE_MODEL
+    tokenizer_source = str(_BASE_MODEL)
     print(f"[Fine-tune] Loading tokenizer from {tokenizer_source}...")
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_source)
 
@@ -186,8 +194,9 @@ def fine_tune(
     test_ds = test_ds.map(tokenize, batched=True)
 
     # ── Model ────────────────────────────────────────────────────────────────
-    # Always start fine-tuning from the base model, not a previously saved local checkpoint.
-    model_source = _BASE_MODEL
+    # Always start fine-tuning from the base model instead of any existing local checkpoint.
+    # model_source = str(_CONTINUE_FROM_PATH) if _CONTINUE_FROM_PATH.exists() else _BASE_MODEL
+    model_source = str(_BASE_MODEL)
     print(f"[Fine-tune] Loading model from {model_source}...")
     model = AutoModelForSequenceClassification.from_pretrained(
         model_source, num_labels=2, ignore_mismatched_sizes=True
