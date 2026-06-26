@@ -919,14 +919,15 @@ function renderResult(r, { skipHistory = false } = {}) {
 
   // Score bars
   const nlp = r.nlp_result ?? {};
-  const nlpContrib = nlp.is_spam ? Math.round(nlp.score * 30) : 0;
+  const maxNlpPoints = 15;
+  const nlpContrib = Math.round(nlp.score * maxNlpPoints);
   const flagScore  = Math.min(100, Math.round(score - nlpContrib));
 
   document.getElementById('score-breakdown').classList.add('show');
   document.getElementById('sb-tech-val').textContent = flagScore + ' pts';
   document.getElementById('sb-tech-bar').style.width  = Math.min(flagScore, 100) + '%';
   document.getElementById('sb-nlp-val').textContent  = nlpContrib + ' pts';
-  document.getElementById('sb-nlp-bar').style.width  = Math.min(nlpContrib * 3, 100) + '%';
+  document.getElementById('sb-nlp-bar').style.width  = Math.min(Math.round(nlpContrib * 100 / maxNlpPoints), 100) + '%';
 
   // Phishing flags
   document.getElementById('block-flags').classList.add('show');
