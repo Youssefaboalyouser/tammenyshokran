@@ -511,3 +511,10 @@ def verdict_from_score(score: float) -> str:
     elif score >= 30:
         return "SUSPICIOUS"
     return "SAFE"
+
+def verdic_from_score_for_text(score: float) -> str:
+    if score >= 20:
+        return "High Risk"
+    elif score >= 10:
+        return "SUSPICIOUS"
+    return "SAFE"

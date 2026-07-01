@@ -33,23 +33,23 @@ IMAGE_MIME_TYPES = {
 
 
 # ── OCR helpers ──────────────────────────────────────────────────────────────
-
+# this function used for transforms raw file attachment image bytes into high contrast binary image (black and white) suitable for OCR processing, returning the processed image as a numpy array
 def preprocess_for_ocr(image_bytes: bytes) -> np.ndarray:
-    nparr = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    nparr = np.frombuffer(image_bytes, np.uint8) # convert bytes to numpy array of 8bit unsigned integers
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR) # decode the image bytes into a color image (BGR format) using OpenCV
     if img is None:
         raise ValueError("Could not decode image bytes")
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    gray = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # convert the color image to grayscale
+    gray = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC) # upscale the image by 2x using cubic interpolation to improve OCR accuracy
+    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1] # apply Otsu's thresholding to convert the grayscale image to a binary image (black and white) for better OCR results
     return thresh
 
-
+# this function used for translates visual grahhic content of image attachments into machine readable text using tesseract OCR, returning the extracted text as a string or empty string if tesseract is not available
 def ocr_image_bytes(image_bytes: bytes, lang: str = "ara+eng") -> str:
     if not TESSERACT_AVAILABLE:
         return ""
     preprocessed = preprocess_for_ocr(image_bytes)
-    config = r"--oem 3 --psm 3"
+    config = r"--oem 3 --psm 3" # configure the Neural Network LSTM engine mode + page segmentation mode to automaticlly segment layout blocks
     text = pytesseract.image_to_string(preprocessed, lang=lang, config=config)
     return text.strip()
 
@@ -138,7 +138,7 @@ def _first_received_ip(msg) -> Optional[str]:
 
 
 # ── Main parser ──────────────────────────────────────────────────────────────
-
+# this function used for parses raw .eml bytes into a structured dictionary containing all relevant email information, including sender, recipient, subject, body, links, attachments, and headers(central engine for the email parsing service)
 def parse_eml_bytes(raw_bytes: bytes) -> dict:
     """
     Parse raw .eml bytes and return a structured dictionary.
@@ -151,7 +151,6 @@ def parse_eml_bytes(raw_bytes: bytes) -> dict:
     sender = _parse_address(sender_raw)
     reply_parsed = _parse_address(reply_to_raw)
     sender["reply_to"] = reply_parsed.get("email")
-
     recipient = _decode_header_value(msg.get("To"))
 
     plain_text = None
@@ -159,7 +158,7 @@ def parse_eml_bytes(raw_bytes: bytes) -> dict:
     attachments = []
     all_links = []
     is_image_email = False
-
+    # check if the email is multipart (contains multiple parts like text, html, attachments) or one type of content, and process accordingly
     if msg.is_multipart():
         for part in msg.walk():
             content_type = part.get_content_type()

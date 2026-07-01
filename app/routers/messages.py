@@ -16,7 +16,7 @@ from ..database import get_db
 from ..utilities.oauth2 import get_current_user
 from ..services.virustotal import scan_url
 from ..services.nlp_model import predict_spam
-from ..services.phishing_detector import compute_risk_score, verdict_from_score
+from ..services.phishing_detector import compute_risk_score, verdic_from_score_for_text, verdict_from_score
 
 router = APIRouter(prefix="/api/messages", tags=["Messages"])
 
@@ -96,8 +96,8 @@ async def analyze_message(
         nlp_is_spam=nlp_result["is_spam"],
         nlp_score=nlp_result["score"],
     )
-    verdict = verdict_from_score(risk_score)
-
+    verdict = verdic_from_score_for_text(risk_score)
+    
     return MessageAnalysisResponse(
         channel=channel,
         sender=payload.sender,
